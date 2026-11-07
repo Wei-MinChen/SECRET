@@ -3,13 +3,28 @@
 **S**creen and **E**valuate **C**atalogued **R**isk scores to **E**nhance **T**rait predictions.
 
 Version 0.9.3 — (c) 2023-2026 Wei-Min Chen. See the license notice at the top of each source file.
-More about SECRET: <https://kingrelatedness.com/SECRET/>
+
+Website: <https://www.kingrelatedness.com/SECRET/>
 
 SECRET screens many polygenic scores (PGS), for example scores from the
 [PGS Catalog](https://www.pgscatalog.org/), against the traits in your data set. For every trait it
 ranks the scores and builds combined predictions from the top ones. The scores themselves can be
 calculated from PLINK genotypes with [secretscores](https://github.com/Wei-MinChen/SECRET-scores), which
 writes the score file that SECRET reads.
+
+## How it works
+
+SECRET starts with a PGS-wide scan: every score is evaluated against the trait in your data, by its AUC
+for a binary trait or by the R² of its association with a quantitative trait, and the scores are ranked.
+Two prediction models come out of the ranking:
+
+- **SECRET-Best**, the top-ranked score (`BEST` in the output);
+- **SECRET-WTSUM**, a weighted sum of several of the top scores, after scores that are highly correlated
+  with each other have been pruned (`WTSUM` in the output).
+
+SECRET can also use parent–offspring trios in a family-based version of the method (`--tdt`). The
+approach is meant for studies of any size with genome-wide SNP data, and is especially useful when the
+study is small or modest in size, or when no PGS has been developed for the trait yet.
 
 ## Build
 
@@ -57,7 +72,7 @@ father and mother), followed by the traits.
 | Option | What it does |
 |---|---|
 | `--auc` | AUC of every score for every binary trait. Writes one table per trait, `<prefix>_<trait>.auc`, with the best score first, and prints the cross-validated AUC of the best score and how consistently the same score is chosen (`--fold`, `--repeat`). With `--strat`, the AUCs are also computed in each stratum. |
-| `--logistic` | Logistic regression of each binary trait on each score: OR, Z and P, written to `<prefix>_<trait>.logistic`. Reports the AUC of the best score and of combinations of the top `--ntop` scores: a weighted sum (after pruning correlated scores at R² > `--pruner2`), ridge, elastic net and lasso. `--cv` evaluates them by cross-validation. |
+| `--logistic` | Logistic regression of each binary trait on each score: OR, Z and P, written to `<prefix>_<trait>.logistic`. Reports the AUC of the best score and of combinations of the top `--ntop` scores: a weighted sum (`WTSUM`, after pruning correlated scores at R² > `--pruner2`), ridge, elastic net and lasso. `--cv` evaluates them by cross-validation. |
 | `--linear` | The same for quantitative traits: `<prefix>_<trait>.linear` with the R² of each score. |
 | `--coxph` | Cox regression of each score for a time-to-event outcome given by `--surv time,event`: hazard ratio, Z and P, written to `<prefix>_<time>2<event>.coxph`, and penalized models of the top scores. |
 | `--tdt` | Transmission test of the scores in parent–offspring trios: `<prefix>_<trait>.tdt`. |
@@ -81,6 +96,13 @@ father and mother), followed by the traits.
 ## Output
 
 Every scan writes its table to `<prefix>_<trait>.<scan>` (see the table above); in the tables of `--auc`,
-`--logistic`, `--linear` and `--coxph` the strongest scores come first. The correlations among the top scores are written to `*_PGScorr.txt`, and the model files
-that `--readmodel` reads to `*.mod`. With `--rplot`, each trait gets its own figures, for example
-`<prefix>_<trait>_aucplot.pdf` for the top 30 scores of `--auc`, with a heatmap of their correlations.
+`--logistic`, `--linear` and `--coxph` the strongest scores come first. The correlations among the top scores
+are written to `*_PGScorr.txt`, and the model files that `--readmodel` reads to `*.mod`. With `--rplot`, each
+trait gets its own figures, for example `<prefix>_<trait>_aucplot.pdf` for the top 30 scores of `--auc`, with a
+heatmap of their correlations.
+
+## Citation
+
+Chen W-M, Manichaikul A, Onengut-Gumuscu S, Worrall BB, Rich SS. Prediction of Polygenic Risks by
+Screening Thousands of Polygenic Scores. bioRxiv (2025).
+<https://doi.org/10.1101/2025.10.03.680330>

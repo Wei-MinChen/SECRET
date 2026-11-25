@@ -2,9 +2,8 @@
 #define __QUICKINDEX_H__
 
 #include "MathVector.h"
-#include "StringArray.h"
+#include "SecretStrings.h"
 #include "IntArray.h"
-#include "StringMap.h"
 
 class QuickIndex : public IntArray
    {

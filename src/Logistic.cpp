@@ -12,7 +12,7 @@
 //
 // All computer programs have bugs. Use this file at your own risk.
 //
-// Oct 28, 2026
+// Nov 10, 2026
 //
 // --logistic: logistic regression of a binary trait on one polygenic
 // score at a time, with the --covariate columns carried in the model.
@@ -28,8 +28,7 @@
 #include "Constant.h"
 #include "Error.h"
 #include "DataInput.h"
-#include "StringArray.h"
-#include "StringBasics.h"
+#include "SecretStrings.h"
 #include "QuickIndex.h"
 #include "MathStats.h"
 #include "PenalizedLogit.h"
@@ -746,6 +745,7 @@ void Logistic_Scan(const char * phefile, const char * dictfile,
   if (covariateList[0])
     printf("\t--covariate %s\n", covariateList);
   printf("\t--score %s\n", rsfile);
+  PrintPGSSelectionOptions();
   if (dictfile[0])
     printf("\t--diction %s\n", dictfile);
   if (nTop)
@@ -1156,12 +1156,22 @@ void Logistic_Scan(const char * phefile, const char * dictfile,
     int trait = affections[a];
     const char * bestName = bestIndex[a] >= 0 ?
          (const char*)rsNames[bestIndex[a]] : "NA";
-    printf("%20s%10d%10d%10d%24s%10.2G\n",
+    printf("%20s%10d%10d%10d%24s%10.2G",
          (const char*)alltraitNames[trait], nCase[a] + nControl[a],
          nCase[a], nControl[a], bestName,
          bestP[a] == _NAN_ ? 1.0 : bestP[a]);
-    if (annotationCount)
-      printf("%11s", (const char*)annotation[bestIndex[a]]);
+    // The annotation belongs to the row, so it is written before the line
+    // ends, left-aligned under its header (leading blanks of the dictionary
+    // text are dropped).  There is no annotation when no PGS was fitted.
+    if (annotationCount) {
+      const char * note = "";
+      if (bestIndex[a] >= 0) {
+        note = (const char*)annotation[bestIndex[a]];
+        while (*note == ' ') note++;
+      }
+      printf(" %s", note);
+    }
+    printf("\n");
   } // End of a loop
 
   // AUC summaries (0.000 means the model was not fitted): the unadjusted

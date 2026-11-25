@@ -12,7 +12,7 @@
 //
 // All computer programs have bugs. Use this file at your own risk.
 //
-// Oct 22, 2026
+// Nov 10, 2026
 //
 // In-process ridge / elastic net / lasso solver, replacing the R
 // glmnet() calls used by the penalized models.  See Penalized.h.
@@ -38,7 +38,7 @@
 #include "Constant.h"
 #include "Error.h"
 #include "DataInput.h"
-#include "StringArray.h"
+#include "SecretStrings.h"
 
 // ---------------------------------------------------------------------
 // deterministic xorshift64* generator, so fold assignment and the
@@ -689,8 +689,17 @@ void PenalizedNetR2(Matrix & X, Vector & y, int repeat, unsigned long seed,
       }
    }
 
+// x rounded to the given number of decimals, exactly as if it had been written
+// with printf("%.<decimals>f") and read back
+static double RoundedTo(double x, int decimals)
+   {
+   char buffer[64];
+   sprintf(buffer, "%.*f", decimals, x);
+   return atof(buffer);
+   }
+
 int PenalizedRegressionR2(const char * input, const char * traitName,
-   int repeat, int coreCount, String & msg)
+   int repeat, int coreCount, String & msg, Matrix & rsqOut, Matrix & coefOut)
    {
    String pgsfile(input);
    pgsfile.Add("_PGS.txt");
@@ -741,26 +750,15 @@ int PenalizedRegressionR2(const char * input, const char * traitName,
    Matrix rsq, coefs;
    PenalizedNetR2(X, y, repeat, 20261020UL, rsq, coefs);
 
-   String rsqfile("tmp_");
-   rsqfile.Add(input);
-   rsqfile.Add("_net_rsq.txt");
-   FILE * fp = fopen((const char*)rsqfile, "wt");
-   if (fp == NULL)
-      error("Cannot open %s to write.", (const char*)rsqfile);
+   // the results go back to the caller in memory
+   rsqOut.Dimension(3, 2);
    for (int a = 0; a < 3; a++)
-      fprintf(fp, "%.5f\t%.5f\n", rsq[a][0], rsq[a][1]);
-   fclose(fp);
-
-   String coeffile("tmp_");
-   coeffile.Add(input);
-   coeffile.Add("_net_coef.txt");
-   fp = fopen((const char*)coeffile, "wt");
-   if (fp == NULL)
-      error("Cannot open %s to write.", (const char*)coeffile);
-   fprintf(fp, "Ridge\tNet\tLasso\n");
+      for (int k = 0; k < 2; k++)
+         rsqOut[a][k] = RoundedTo(rsq[a][k], 5);
+   coefOut.Dimension(p + 1, 3);
    for (int j = 0; j <= p; j++)
-      fprintf(fp, "%.6f\t%.6f\t%.6f\n", coefs[j][0], coefs[j][1], coefs[j][2]);
-   fclose(fp);
+      for (int a = 0; a < 3; a++)
+         coefOut[j][a] = RoundedTo(coefs[j][a], 6);
 
    msg.Copy("Penalized regression (ridge / elastic net / lasso) fitted in C++\n");
    if (traitName != NULL && traitName[0] != '\0')

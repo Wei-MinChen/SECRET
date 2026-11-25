@@ -18,10 +18,10 @@
 #include <math.h>
 #include <string.h>
 #include "MathSVD.h"
-#include "StringArray.h"
+#include "SecretStrings.h"
+#include "Constant.h"
 #include "MathStats.h"
 #include "QuickIndex.h"
-#include "StringHash.h"
 #include "DataInput.h"
 #ifdef _OPENMP
   #include <omp.h>
@@ -30,6 +30,8 @@
 //extern void AdjustPC1(Matrix &risks, int coreCount);
 const char *gTraitList = "";     // set from --trait in Main.cpp
 const char *gCovarFile = "";     // set from --covarfile in Main.cpp
+const char *gExtractFile = "";   // set from --extract in Main.cpp
+const char *gExcludeFile = "";   // set from --exclude in Main.cpp
 bool gHasCoverage = false;       // set by ReadKeys when the dictionary has SNPused / Coverage columns
 Vector gSNPused, gCoverage;      // per PGS (same order as rsNames), _NAN_ when unknown
 bool gRecodeBinary01 = true;   // survival scans turn this off: their event column is 0/1 by design
@@ -386,6 +388,114 @@ void ReadTraits(const char *phefile, StringArray &alltraitNames,
     MergeColumnFile(files[f], "trait", alltraitNames, familyID, sampleID, alltraits, coreCount);
 }
 
+void PrintPGSSelectionOptions()
+{
+  if (gExtractFile[0]) printf("\t--extract %s\n", gExtractFile);
+  if (gExcludeFile[0]) printf("\t--exclude %s\n", gExcludeFile);
+}
+
+// The PGS names listed in --extract or --exclude: one or more comma-separated files.  As for
+// PLINK, any whitespace-delimited layout is fine (one name per line is usual), a name may
+// appear more than once, and a name that is not in the score data is no problem.  Commas
+// also separate names, and double quotes around a name are dropped, so a csv list works too.
+// ids gets the distinct names; index maps each name to its position in ids.
+static void ReadPGSList(const char *filelist, StringArray &ids, StringIntHash &index)
+{
+  StringArray files;
+  SplitFileList(filelist, files);
+  ids.Dimension(0);
+  index.Clear();
+  for (int f = 0; f < files.Length(); f++) {
+    StringArray lines;
+    ReadLines(files[f], lines, false);
+    for (int l = 0; l < lines.Length(); l++) {
+      const char *p = (const char*)lines[l];
+      String token;
+      for (;; p++) {
+        char ch = *p;
+        if (ch == '\0' || ch == ' ' || ch == '\t' || ch == '\r' || ch == ',') {
+          if (!token.IsEmpty()) {
+            if (index.Integer(token) == -1) {
+              index.SetInteger((const char*)token, ids.Length());
+              ids.Push(token);
+            }
+            token.Clear();
+          }
+          if (ch == '\0') break;
+        }
+        else if (ch != '"')
+          token.Add(ch);
+      }   // End of p loop
+    }   // End of l loop
+  }   // End of f loop
+}
+
+// --extract keeps the PGS listed in its files and --exclude removes the PGS listed in its
+// files, as in PLINK (for PGS here, not for SNPs).  With both, --extract is applied first,
+// so a PGS must be listed in --extract and not in --exclude to stay.  M has one row per
+// sample and one column per PGS; the columns of the PGS that stay are kept in their order.
+static void SelectPGS(StringArray &rsNames, Matrix &M)
+{
+  if (!gExtractFile[0] && !gExcludeFile[0]) return;
+  int rsCount = rsNames.Length();
+  IntArray keep(rsCount);
+  keep.Set(1);
+  for (int pass = 0; pass < 2; pass++) {
+    const char *option = (pass == 0) ? "--extract" : "--exclude";
+    const char *list = (pass == 0) ? gExtractFile : gExcludeFile;
+    if (!list[0]) continue;
+    StringArray ids;
+    StringIntHash index;
+    ReadPGSList(list, ids, index);
+    if (ids.Length() == 0)
+      error("No PGS names found in the %s file(s) %s.", option, list);
+    int before = keep.Sum();
+    IntArray found(ids.Length());
+    found.Zero();
+    for (int r = 0; r < rsCount; r++) {
+      int k = index.Integer(rsNames[r]);
+      if (k > -1) found[k] = 1;
+      if (pass == 0) {
+        if (k == -1) keep[r] = 0;
+      }
+      else if (k > -1)
+        keep[r] = 0;
+    }   // End of r loop
+    int after = keep.Sum();
+    printf("%s: %d of %d PGS remain.\n", option, after, before);
+    int missing = ids.Length() - found.Sum();
+    if (missing > 0) {
+      printf("  Note: %d of the %d names in the %s file(s) are not PGS in the score data", missing, ids.Length(), option);
+      int shown = 0;
+      for (int k = 0; k < ids.Length() && shown < 5; k++)
+        if (!found[k]) {
+          printf("%s%s", shown == 0 ? " (e.g., " : ", ", (const char*)ids[k]);
+          shown++;
+        }
+      printf("%s.\n", shown ? ")" : "");
+    }
+    if (after == 0) {
+      printf("PGS in the score data look like:\n");
+      for (int r = 0; r < 5 && r < rsCount; r++)
+        printf("  %s\n", (const char*)rsNames[r]);
+      error("No PGS remain after %s. Please check the PGS names in %s.", option, list);
+    }
+  }   // End of pass loop
+  int rowCount = M.rows;
+  int newCount = 0;
+  for (int r = 0; r < rsCount; r++) {
+    if (!keep[r]) continue;
+    if (newCount != r) {
+      for (int i = 0; i < rowCount; i++)
+        M[i][newCount] = M[i][r];
+      rsNames[newCount] = rsNames[r];
+    }
+    newCount++;
+  }   // End of r loop
+  rsNames.Dimension(newCount);
+  M.Dimension(rowCount, newCount);
+}
+
 // --score: one or more files.  Rows are samples, columns are PGS.
 void ReadScoreMatrix(const char *rsfile, StringArray &rsNames, StringArray &rowNames, Matrix &M, int coreCount)
 {
@@ -453,6 +563,7 @@ void ReadScoreMatrix(const char *rsfile, StringArray &rsNames, StringArray &rowN
     }
     printf("%d PGS for %d of %d samples loaded from %s.\n", addCount, matched, rowCount, (const char*)files[f]);
   }   // End of f loop
+  SelectPGS(rsNames, M);   // --extract and --exclude
 }
 
 void ReadRisks(const char *rsfile, StringArray &rsNames, StringArray &familyID, StringArray &sampleID, Matrix &risks, IntArray &rsKey, int coreCount)
@@ -826,6 +937,98 @@ void ReadKeys(const char *filename, StringArray &rsNames, StringArray &annotatio
         }
         ReadKeysInText(lines, rsNames, annotation);
     }
+}
+
+// ---------------------------------------------------------------------------------------
+// Trait annotation without --diction: the binary models (.bin) of secretscores keep the trait
+// of the PGS Catalog header in a trait block of their header (see BinaryInput.cpp of
+// secretscores):
+//   byte 0        version, 3 or 4
+//   bytes 1..4    headerSize (uint32, little-endian), 109 without a trait block
+//   bytes 5..108  26 x uint32, the number of SNPs on each chromosome
+//   bytes 109..   "TRAI", uint32 L, L bytes "trait", or "trait<TAB>trait_efo"
+//                 (headerSize = 109 + 8 + L)
+// The score called NAME in the score file is NAME.bin, which --makebin writes.
+// ---------------------------------------------------------------------------------------
+static unsigned int LittleEndian32(const unsigned char *p)
+{
+  return (unsigned int) p[0] | ((unsigned int) p[1] << 8) | ((unsigned int) p[2] << 16) | ((unsigned int) p[3] << 24);
+}
+
+// The trait of one .bin file (the trait, else the EFO term); false when the file is not there,
+// is not a version 3 or 4 model, or has no trait.
+static bool ReadTraitOfBinaryModel(const char *binfile, String &trait)
+{
+  const unsigned int FIXED = 109, MAXHEADER = 1 << 20;
+  FILE *fp = fopen(binfile, "rb");
+  if (fp == NULL) return false;
+  unsigned char start[5];
+  bool ok = fread(start, 1, 5, fp) == 5 && (start[0] == 3 || start[0] == 4);
+  unsigned int headerSize = ok ? LittleEndian32(start + 1) : 0;
+  ok = ok && headerSize >= FIXED + 8 && headerSize <= MAXHEADER;   // 109: a model without a trait
+  unsigned char *header = NULL;
+  if (ok) {
+    header = new unsigned char[headerSize];
+    memcpy(header, start, 5);
+    ok = fread(header + 5, 1, headerSize - 5, fp) == headerSize - 5;
+  }
+  fclose(fp);
+  if (ok) ok = memcmp(header + FIXED, "TRAI", 4) == 0 && headerSize == FIXED + 8 + LittleEndian32(header + FIXED + 4);
+  if (ok) {
+    String text, efo;
+    int length = (int) (headerSize - FIXED - 8);
+    for (int i = 0; i < length; i++) text += (char) header[FIXED + 8 + i];   // a character 0 would end it
+    int tab = text.FindChar('\t');
+    if (tab > -1) {
+      efo = text.SubStr(tab + 1);
+      text = text.SubStr(0, tab);
+    }
+    text.Trim();
+    efo.Trim();
+    String found = text.IsEmpty() ? efo : text;
+    for (int i = 0; i < found.Length(); i++)
+      if ((unsigned char) found[i] < ' ') found[i] = ' ';
+    ok = !found.IsEmpty() && found.Find("SECRETS GWAS summary statistics") != 0;   // not a PGS
+    if (ok) trait = found;
+  }
+  delete [] header;
+  return ok;
+}
+
+// The annotation of the scores in rsNames from the .bin files that are next to the score
+// file(s) or in the current directory.  Nothing is changed (and nothing is printed) when
+// no .bin file with a trait is found, so a run without .bin files is as before; otherwise
+// every score has an annotation, and a score without a trait is annotated by its name, as
+// with a --diction file.
+void ReadKeysFromBinaryModels(const char *rsfile, StringArray &rsNames, StringArray &annotation)
+{
+  StringArray files, folders;
+  SplitFileList(rsfile, files);
+  for (int f = 0; f < files.Length(); f++) {
+    int slash = -1;   // the end of the folder part of the file name
+    for (int i = 0; i < files[f].Length(); i++)
+      if (files[f][i] == '/' || files[f][i] == '\\') slash = i;
+    String folder = slash > -1 ? files[f].SubStr(0, slash + 1) : String("");
+    if (folders.Find(folder) == -1) folders.Push(folder);
+  }   // End of f loop
+  if (folders.Find("") == -1) folders.Push("");   // the current directory
+  int rsCount = rsNames.Length(), found = 0;
+  StringArray traits(rsCount);
+  for (int r = 0; r < rsCount; r++) {
+    const String &name = rsNames[r];
+    if (name.IsEmpty() || name.FindChar('/') > -1 || name.FindChar('\\') > -1 || name == "." || name == "..")
+      continue;
+    for (int d = 0; d < folders.Length(); d++)
+      if (ReadTraitOfBinaryModel(folders[d] + name + ".bin", traits[r])) {
+        found++;
+        break;
+      }
+  }   // End of r loop
+  if (found == 0) return;
+  annotation.Dimension(rsCount);
+  for (int r = 0; r < rsCount; r++)
+    annotation[r] = traits[r].IsEmpty() ? rsNames[r] : traits[r];
+  printf("  %d of %d scores annotated by the trait in their binary models (.bin) of secretscores\n", found, rsCount);
 }
 
 void ReadTraits4(const char *phefile, StringArray &alltraitNames, StringArray &familyID, StringArray &sampleID, StringArray &FAID, StringArray &MOID, Matrix &alltraits, int coreCount)
@@ -1402,6 +1605,8 @@ void SECRET_Read(const char *phefile, const char *dictfile, const char *rsfile, 
         ReadKeys(dictfile, rsNames, annotation);
         printf("Data dictionary loaded.\n");
     }
+    else
+        ReadKeysFromBinaryModels(rsfile, rsNames, annotation);
     /*
     if (idCount && pcarsfile && pcarsfile[0]) { // Step 6: Read in pcars file, optional
         StringArray rowNames;

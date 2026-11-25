@@ -19,7 +19,7 @@
 #include <string.h>
 #include <algorithm>
 #include <vector>
-#include "StringArray.h"
+#include "SecretStrings.h"
 #include "MathStats.h"
 #include "QuickIndex.h"
 #include "Constant.h"

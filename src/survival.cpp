@@ -35,10 +35,10 @@
 #include <time.h>
 
 #include "MathSVD.h"
-#include "StringArray.h"
+#include "SecretStrings.h"
+#include "Constant.h"
 #include "MathStats.h"
 #include "QuickIndex.h"
-#include "StringHash.h"
 #include "DataInput.h"
 #include "Random.h"
 #ifdef _OPENMP
@@ -1515,6 +1515,7 @@ void survival_Scan(const char * phefile, const char * dictfile,
    if (covariateList[0])
       printf("\t--covariate %s\n", covariateList);
    printf("\t--score %s\n", rsfile);
+   PrintPGSSelectionOptions();
    if (dictfile[0])
       printf("\t--diction %s\n", dictfile);
    if (rplotFlag)

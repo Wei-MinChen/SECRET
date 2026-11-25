@@ -12,7 +12,7 @@
 //
 // All computer programs have bugs. Use this file at your own risk.
 //
-// Oct 22, 2026
+// Nov 10, 2026
 //
 // Penalized (ridge / elastic net / lasso) linear regression for SECRET.
 // This replaces the R glmnet() calls with an in-process C++ solver, so
@@ -40,7 +40,7 @@
 #include "MathMatrix.h"
 #include "MathVector.h"
 #include "IntArray.h"
-#include "StringBasics.h"
+#include "SecretStrings.h"
 
 class ElasticNet
    {
@@ -123,12 +123,15 @@ class ElasticNet
 void PenalizedNetR2(Matrix & X, Vector & y, int repeat, unsigned long seed,
    Matrix & rsq, Matrix & coefs);
 
-// Drop-in replacement for rplot.cpp's glmnet(): reads <input>_PGS.txt
-// (written by WriteTable in OLS.cpp) and writes
-//   tmp_<input>_net_rsq.txt
-//   tmp_<input>_net_coef.txt
-// in the same format the existing code consumes.
+// Reads <input>_PGS.txt (written by WriteTable in OLS.cpp), fits ridge, elastic
+// net and lasso, and returns the results in memory (no files are written):
+//   rsq    is 3 x 2: rows ridge, net, lasso; column 0 is the R^2 in the samples
+//          used for fitting, column 1 the cross-validated R^2
+//   coefs  is (p+1) x 3: row 0 is the intercept, rows 1..p the coefficients of
+//          the p PGSs in the file; columns ridge, net, lasso
+// The numbers are rounded to 5 (rsq) and 6 (coefs) decimals, as they were when
+// they were handed over in text files, so the output of SECRET is unchanged.
 int PenalizedRegressionR2(const char * input, const char * traitName,
-   int repeat, int coreCount, String & msg);
+   int repeat, int coreCount, String & msg, Matrix & rsqOut, Matrix & coefOut);
 
 #endif

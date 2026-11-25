@@ -12,17 +12,17 @@
 //
 // All computer programs have bugs. Use this file at your own risk.
 //
-// Oct 26, 2026
+// Nov 10, 2026
 
 #include <time.h>
 #include <math.h>
 #include <string.h>
 #include "Random.h"
 #include "MathSVD.h"
-#include "StringArray.h"
+#include "SecretStrings.h"
+#include "Constant.h"
 #include "MathStats.h"
 #include "QuickIndex.h"
-#include "StringHash.h"
 #include "DataInput.h"
 #include "Penalized.h"
 #ifdef _OPENMP
@@ -996,6 +996,7 @@ void Linear_Scan(const char *phefile, const char *dictfile, const char *rsfile, 
   if (gTraitList[0]) printf("\t--trait %s\n", gTraitList);
   if(covariateList[0]) printf("\t--covariate %s\n", covariateList);
   printf("\t--score %s\n", rsfile);
+  PrintPGSSelectionOptions();
   if(dictfile[0]) printf("\t--diction %s\n", dictfile);
   if(modelfile[0]) printf("\t--readmodel %s\n", modelfile);
   if(nTop) printf("\t--ntop %d\n", nTop);
@@ -1249,28 +1250,20 @@ void Linear_Scan(const char *phefile, const char *dictfile, const char *rsfile, 
     WriteTable(outfile, pgsTable, header, col0);
     printf("  Top %d polygenic scores for trait %s write to %s\n",
         toprsCount, (const char*)alltraitNames[traits[t]], (const char*)outfile);
-    // Ridge / elastic net / lasso are fitted in-process by Penalized.cpp.
-    // plotRSQ() below still runs R for the plots, but it no longer writes
-    // the tmp_*_net_*.txt files, so these results are not overwritten.
-    PenalizedRegressionR2(outfile0, alltraitNames[traits[t]], repeat, coreCount, msg);
+    // Ridge / elastic net / lasso are fitted in-process by Penalized.cpp,
+    // which returns the R-squared table and the coefficients in memory.
+    // plotRSQ() below runs R for the plots only.
+    Matrix netRsq, netCoef;
+    PenalizedRegressionR2(outfile0, alltraitNames[traits[t]], repeat, coreCount, msg, netRsq, netCoef);
     printf("  %s", (const char*)msg);
     if(rplotFlag){
       // plots only; the penalized numbers were computed in C++ just above
       plotRSQ(outfile0, alltraitNames[traits[t]], "", msg);
       printf("  %s", (const char*)msg);
     }
-    {
-      StringArray lines;
-      outfile = "tmp_"; outfile.Add(outfile0); outfile.Add("_net_rsq.txt");
-      ReadLines(outfile, lines, false);
-      StringArray tokens;
-      for(int m = 0; m < 3; m++){
-        tokens.Clear();
-        tokens.AddTokens(lines[m], '\t');
-        for(int k = 0; k < 2; k++)
-          rsqs[k][t][m] = tokens[k].AsDouble();
-      } // End of m loop
-    }
+    for(int m = 0; m < 3; m++)
+      for(int k = 0; k < 2; k++)
+        rsqs[k][t][m] = netRsq[m][k];
     // WriteModels
     int modelCount = 5;
     Matrix weights(toprsCount, modelCount); weights.Zero();
@@ -1289,10 +1282,9 @@ void Linear_Scan(const char *phefile, const char *dictfile, const char *rsfile, 
     weights[sortedrsIndex[t][0]][0] = 1.0;
     for(int r = 0; r < modelrsCount; r++)
       weights[sortedrsIndex[t][r]][1] = beta[r] / rsSD[sortedrsIndex0[t][sortedrsIndex[t][r]]];
-    Matrix netCoef(toprsCount+1, 3);
-    StringArray tmpcolNames;
-    outfile = "tmp_"; outfile.Add(outfile0); outfile.Add("_net_coef.txt");
-    ReadMatrix(outfile, tmpcolNames, netCoef, coreCount);
+    if(netCoef.rows != toprsCount+1 || netCoef.cols != 3)
+      error("The penalized regression returned %d x %d coefficients; %d x 3 are expected.",
+        netCoef.rows, netCoef.cols, toprsCount+1);
     for(int r = 0; r < toprsCount; r++)
       for(int c = 0; c < 3; c++)
         weights[r][c+2] = netCoef[r+1][c] / rsSD[sortedrsIndex0[t][r]];
@@ -1469,23 +1461,14 @@ void WriteRS(String &outfile, StringArray &topID, const char *traitName, Vector 
         WriteTable(outfile, pgsTable, header, col0);
         printf("  Top %d polygenic scores for trait %s write to %s\n",
           toprsCount, (const char*)alltraitNames[traits[t]], (const char*)outfile);
-        // Ridge / elastic net / lasso are now fitted in-process by
-        // Penalized.cpp, so --net no longer needs R or the glmnet package.
-        // The two tmp_* files keep the same names and format, so the
-        // reader just below is unchanged.
-        PenalizedRegressionR2(outfile0, alltraitNames[traits[t]], repeat, coreCount, msg);
+        // Ridge / elastic net / lasso are fitted in-process by Penalized.cpp
+        // (no R or glmnet needed); the R-squared table comes back in memory.
+        Matrix netRsq, netCoef;
+        PenalizedRegressionR2(outfile0, alltraitNames[traits[t]], repeat, coreCount, msg, netRsq, netCoef);
         printf("  %s", (const char*)msg);
-
-        StringArray lines;
-        outfile = "tmp_"; outfile.Add(outfile0); outfile.Add("_net_rsq.txt");
-        ReadLines(outfile, lines);
-        StringArray tokens;
-        for(int m = 0; m < 3; m++){
-          tokens.Clear();
-          tokens.AddTokens(lines[m], '\t');
+        for(int m = 0; m < 3; m++)
           for(int k = 0; k < 2; k++)
-            rsqs[k][t][m] = tokens[k].AsDouble();
-        } // End of m loop
+            rsqs[k][t][m] = netRsq[m][k];
       }
     } // End of t loop
     printf("\nSummary of %d Trait Prediction\n", traitCount);

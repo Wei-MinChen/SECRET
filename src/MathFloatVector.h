@@ -1,7 +1,7 @@
 #ifndef __MATHFLOATVECTOR_H__
 #define __MATHFLOATVECTOR_H__
 
-#include "StringBasics.h"
+#include "SecretStrings.h"
 
 #include <stdio.h>
 #include <assert.h>

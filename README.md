@@ -2,7 +2,7 @@
 
 **S**creen and **E**valuate **C**atalogued **R**isk scores to **E**nhance **T**rait predictions.
 
-Version 0.9.3 — (c) 2023-2026 Wei-Min Chen. See the license notice at the top of each source file.
+Version 0.9.4 — (c) 2023-2026 Wei-Min Chen. See the license notice at the top of each source file.
 
 Website: <https://www.kingrelatedness.com/SECRET/>
 
@@ -28,8 +28,7 @@ study is small or modest in size, or when no PGS has been developed for the trai
 
 ## Build
 
-You need a C++ compiler and zlib (`zlib1g-dev` on Debian/Ubuntu). OpenMP is optional but gives
-multithreading.
+You need a C++ compiler. OpenMP is optional but gives multithreading.
 
 ```bash
 make
@@ -61,7 +60,7 @@ Add `--diction` to name the scores in the output and `--prefix` to choose the ou
 | `--score` | The polygenic scores: a table with a header line, the sample ID (IID) in the first column and one column per score. This is the `<prefix>_scores.txt` file of secretscores. If IIDs repeat across families, the IDs are `FID_IID`. |
 | `--pheno` | The traits: a header line, then one row per sample. The first column is the IID, or the header starts with `FID IID` when family IDs are given. Binary traits are coded 1/2 (1 = unaffected, 2 = affected); a trait coded 0/1 is recoded automatically. Tab, space or comma delimited. |
 | `--covarfile` | Optional: covariates in a separate file. Without `--covariate`, every column of it is a covariate. |
-| `--diction` | Optional: a dictionary of the scores. Either two tab-delimited columns (score name, description), or a comma-delimited file with the columns `score` and `trait`. The `<prefix>_scores.coverage` file of secretscores can be used as it is; its SNPs used and coverage then appear in the output too. The description goes to the `Annotation` column. |
+| `--diction` | Optional: a dictionary of the scores. Either two tab-delimited columns (score name, description), or a comma-delimited file with the columns `score` and `trait`. The `<prefix>_scores.coverage` file of secretscores can be used as it is; its SNPs used and coverage then appear in the output too. The description goes to the `Annotation` column. Without `--diction`, the trait is read from the binary models (`<score>.bin`) of secretscores, if they are in the folder of the `--score` file or in the current folder; a score without a `.bin` file or a trait is annotated by its name. |
 | `--readmodel` | Optional: a model file (`.mod`) written by an earlier scan, to evaluate it in another data set. |
 
 For `--tdt`, the phenotype file needs `FID IID FA MO` as its first four columns (family, individual,

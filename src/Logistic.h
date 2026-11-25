@@ -34,7 +34,7 @@
 #include "MathMatrix.h"
 #include "MathVector.h"
 #include "IntArray.h"
-#include "StringArray.h"
+#include "SecretStrings.h"
 
 // Status codes returned by Logistic_BuildModel.
 enum {

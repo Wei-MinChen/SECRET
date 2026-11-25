@@ -1,7 +1,7 @@
 #ifndef __MEMORYINFO_H__
 #define __MEMORYINFO_H__
 
-#include "StringBasics.h"
+#include "SecretStrings.h"
 
 String & MemoryInfo(double bytes);
 

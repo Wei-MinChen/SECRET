@@ -12,23 +12,27 @@
 //
 // All computer programs have bugs. Use this file at your own risk.
 //
-// Oct 28, 2026
+// Nov 24, 2026
 
-#define VERSION "0.9.3"
+// Release version.  Without the next line the program runs in DEBUG mode (it shows the date
+// in its banner and also offers --gdt, --kinship, --popstruct and --nowrite).
+#define VERSION "0.9.4"
 
 #include <math.h>
 #include <time.h>
 #include "IntArray.h"
-#include "StringArray.h"
+#include "SecretStrings.h"
+#include "Constant.h"
 #include "MathStats.h"
 #include "Parameters.h"
 #include "Error.h"
-#include "StringHash.h"
 #ifdef _OPENMP
   #include <omp.h>
 #endif
 
 extern const char *gTraitList;
+extern const char *gExtractFile;
+extern const char *gExcludeFile;
 extern const char *gCovarFile;
 extern const char *gRpath;
 extern bool CheckRInstallation(const char *rpath, String &version, String &exe);
@@ -52,7 +56,7 @@ extern void survival_Scan(const char *phefile, const char *dictfile, const char 
 void ShowBanner()
 {
 #ifndef VERSION
-   printf("SECRET (c) 10/28/2026 Wei-Min Chen");
+   printf("SECRET (c) 11/10/2026 Wei-Min Chen");
 #else
    printf("SECRET " VERSION " - (c) 2023-2026 Wei-Min Chen");
 #endif
@@ -64,6 +68,7 @@ int main(int argc, char **argv)
   ShowBanner();
   ParameterList pl;
   String phefile, dictfile, rsfile, modelfile(""), rpath, prefix("secret"), covariateList(""), covarFile("");
+  String extractFile(""), excludeFile("");
   String survList(""), survTime(""), survEvent(""), traitList(""), stratVar("");
   bool aucFlag, rplotFlag, kinshipFlag, pcaFlag, gdtFlag, tdtFlag, linearFlag,
         survFlag, cvFlag, nowriteFlag, logisticFlag;
@@ -78,11 +83,14 @@ int main(int argc, char **argv)
          LONG_STRINGPARAMETER("covarfile", &covarFile)
          LONG_STRINGPARAMETER("diction", &dictfile)
          LONG_STRINGPARAMETER("readmodel", &modelfile)
+    LONG_PARAMETER_GROUP("PGS Filter")
+         LONG_STRINGPARAMETER("extract", &extractFile)
+         LONG_STRINGPARAMETER("exclude", &excludeFile)
     LONG_PARAMETER_GROUP("PGS Scan")
          LONG_PARAMETER("linear", &linearFlag)
          LONG_PARAMETER("logistic", &logisticFlag)
-         LONG_PARAMETER("coxph", &survFlag)
          LONG_PARAMETER("auc", &aucFlag)
+         LONG_PARAMETER("coxph", &survFlag)
          LONG_PARAMETER("tdt", &tdtFlag)
 #ifndef VERSION
          LONG_PARAMETER("gdt", &gdtFlag)
@@ -98,21 +106,18 @@ int main(int argc, char **argv)
          LONG_STRINGPARAMETER("covariate", &covariateList)
          LONG_STRINGPARAMETER("surv", &survList)
          LONG_STRINGPARAMETER("strat", &stratVar)
+    LONG_PARAMETER_GROUP("Computing Parameter")
+         LONG_INTPARAMETER("cpus", &coreCount)
+    LONG_PARAMETER_GROUP("Output")
+         LONG_STRINGPARAMETER("prefix", &prefix)
+         LONG_PARAMETER("rplot", &rplotFlag)
+         LONG_STRINGPARAMETER("rpath", &rpath)
 #ifndef VERSION
+         LONG_PARAMETER("nowrite", &nowriteFlag)
     LONG_PARAMETER_GROUP("Genome Inference")
          LONG_PARAMETER("kinship", &kinshipFlag)
          LONG_PARAMETER("popstruct", &pcaFlag)
 #endif
-    LONG_PARAMETER_GROUP("Computing Parameter")
-         LONG_INTPARAMETER("cpus", &coreCount)
-    LONG_PARAMETER_GROUP("Output")
-         LONG_PARAMETER("rplot", &rplotFlag)
-#ifndef VERSION
-         LONG_PARAMETER("nowrite", &nowriteFlag)
-#endif
-    LONG_PARAMETER_GROUP("Output Parameter")
-         LONG_STRINGPARAMETER("prefix", &prefix)
-         LONG_STRINGPARAMETER("rpath", &rpath)
   END_LONG_PARAMETERS()
 
   pl.Add(new LongParameters("", longParameters));
@@ -155,6 +160,14 @@ int main(int argc, char **argv)
       printf("Note: the --strat trait %s is added to the traits given by --trait.\n", (const char*)stratVar);
     }
   }
+  // --extract / --exclude: the PGS to keep / to remove, applied when the scores are read
+  if (!modelfile.IsEmpty() && (!extractFile.IsEmpty() || !excludeFile.IsEmpty())) {
+    printf("Note: --extract and --exclude are ignored with --readmodel, which uses the PGS listed in the model file.\n");
+    extractFile = "";
+    excludeFile = "";
+  }
+  gExtractFile = (const char*)extractFile;   // read by ReadScoreMatrix; not modified after this point
+  gExcludeFile = (const char*)excludeFile;
   gTraitList = (const char*)traitList;   // read by MakeTraits; traitList is not modified after this point
   if (!covarFile.IsEmpty()) {
     if (phefile.IsEmpty()) {

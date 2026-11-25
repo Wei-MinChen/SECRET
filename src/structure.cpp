@@ -19,8 +19,8 @@
 #include <stdint.h>
 #include <memory.h>
 #include "MathSVD.h"
-#include "StringArray.h"
-#include "StringHash.h"
+#include "SecretStrings.h"
+#include "Constant.h"
 #include "MathStats.h"
 #include "QuickIndex.h"
 #include "DataInput.h"
@@ -153,6 +153,7 @@ void runPCA(const char *rsfile, const char *prefix, bool rplotFlag, int coreCoun
     printf("\nOptions in effect:\n");
     printf("\t--popstruct\n");
     printf("\t--score %s\n", rsfile);
+    PrintPGSSelectionOptions();
     if (rplotFlag)
         printf("\t--rplot\n");
     if (coreCount)

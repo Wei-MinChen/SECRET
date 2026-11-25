@@ -1,7 +1,7 @@
 #ifndef __MATHVECTOR_H__
 #define __MATHVECTOR_H__
 
-#include "StringBasics.h"
+#include "SecretStrings.h"
 
 #include <stdio.h>
 #include <assert.h>

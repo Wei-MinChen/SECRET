@@ -15,10 +15,10 @@
 // Oct 2, 2026
 
 #include <math.h>
-#include "StringArray.h"
+#include "SecretStrings.h"
+#include "Constant.h"
 #include "MathStats.h"
 #include "QuickIndex.h"
-#include "StringHash.h"
 #include "DataInput.h"
 #ifdef _OPENMP
   #include <omp.h>
@@ -31,6 +31,7 @@ void TDT_Scan(const char *phefile, const char *dictfile, const char *rsfile, con
   printf("\nOptions in effect:\n");
   printf("\t--tdt\n");
   printf("\t--score %s\n", rsfile);
+  PrintPGSSelectionOptions();
   printf("\t--pheno %s\n", phefile);
   if (gTraitList[0]) printf("\t--trait %s\n", gTraitList);
   if (dictfile[0])
@@ -146,6 +147,8 @@ void TDT_Scan(const char *phefile, const char *dictfile, const char *rsfile, con
     ReadKeys(dictfile, rsNames, annotation);
     printf("Data dictionary loaded.\n");
   }
+  else
+    ReadKeysFromBinaryModels(rsfile, rsNames, annotation);
   int annotCount = annotation.Length();
   Matrix trioRisk(rsCount, trioCount); trioRisk.Set(_NAN_);
   Matrix adjRisk[3];

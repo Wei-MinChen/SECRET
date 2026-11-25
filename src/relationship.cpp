@@ -16,10 +16,9 @@
 
 #include <time.h>
 #include <math.h>
-#include "StringArray.h"
+#include "SecretStrings.h"
 #include "MathStats.h"
 #include "QuickIndex.h"
-#include "StringHash.h"
 #include "DataInput.h"
 #ifdef _OPENMP
   #include <omp.h>
@@ -65,6 +64,7 @@ void RelationshipInference(const char *phefile, const char *dictfile, const char
     if (covariateList[0])
         printf("\t--covariate %s\n", covariateList);
     printf("\t--score %s\n", rsfile);
+    PrintPGSSelectionOptions();
     if (coreCount)
         printf("\t--cpus %d\n", coreCount);
     if (prefix)

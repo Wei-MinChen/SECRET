@@ -1,7 +1,7 @@
 #ifndef __PARAMETERS_H__
 #define __PARAMETERS_H__
 
-#include "StringMap.h"
+#include "SecretStrings.h"
 
 #include <ctype.h>
 #include <stddef.h>

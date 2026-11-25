@@ -18,10 +18,10 @@
 #include <string.h>
 #include <algorithm>
 #include <vector>
-#include "StringArray.h"
+#include "SecretStrings.h"
+#include "Constant.h"
 #include "MathStats.h"
 #include "QuickIndex.h"
-#include "StringHash.h"
 #include "DataInput.h"
 #include "Random.h"
 #ifdef _OPENMP
@@ -498,6 +498,7 @@ void predictionAUC(const char *phefile, const char *dictfile, const char *rsfile
   if (tuneTrait[0])
     printf("\t--strat %s\n", tuneTrait);
   printf("\t--score %s\n", rsfile);
+  PrintPGSSelectionOptions();
   if(fold) printf("\t--fold %d\n", fold);
   if(repeat) printf("\t--repeat %d\n", repeat);
   if(pcarsfile[0])
@@ -574,7 +575,7 @@ void predictionAUC(const char *phefile, const char *dictfile, const char *rsfile
       printf("The following PGS scores are excluded due to large AUC for the --strat trait %s:\n", tuneTrait);
       for (int r = 0; r < invalidPGSCount; r++) {
         printf("\t%s\t%.3lf", (const char*)rsNames[invalidPGS[r]], aucAll[invalidPGS[r]][tableCount]);
-        if (dictfile[0]) printf("\t%s", (const char*)annotation[invalidPGS[r]]);
+        if (annotation.Length()) printf("\t%s", (const char*)annotation[invalidPGS[r]]);
         printf("\n");
       }   // End of r loop
     }
@@ -764,7 +765,7 @@ void predictionAUC(const char *phefile, const char *dictfile, const char *rsfile
             printf("The following PGS scores are excluded due to large AUC for the --strat trait %s:\n", tuneTrait);
             for (int r = 0; r < invalidPGSCount; r++) {
                 printf("\t%s\t%.3lf", (const char*)rsNames[invalidPGS[r]], auc[invalidPGS[r]][tuneTraitIndex]);
-                if (dictfile[0]) printf("\t%s", (const char*)annotation[invalidPGS[r]]);
+                if (annotation.Length()) printf("\t%s", (const char*)annotation[invalidPGS[r]]);
                 printf("\n");
             }   // End of r loop
         }

@@ -1,9 +1,12 @@
 #include <stdio.h>
-#include "StringArray.h"
+#include "SecretStrings.h"
 #include "MathStats.h"
 
 extern const char *gTraitList;   // --trait: comma-separated traits to analyze; "" means all traits
 extern const char *gCovarFile;   // --covarfile: comma-separated file names, covariates kept apart from the traits; "" means none
+extern const char *gExtractFile; // --extract: comma-separated files of PGS names to keep; "" means all PGS
+extern const char *gExcludeFile; // --exclude: comma-separated files of PGS names to remove; "" means none
+void PrintPGSSelectionOptions();   // writes the --extract / --exclude lines of "Options in effect" (nothing when not used)
 extern bool gHasCoverage;        // the dictionary (--diction) file carries SNPused and/or Coverage information
 extern Vector gSNPused, gCoverage;   // per PGS, in the order of rsNames; _NAN_ when unknown
 void WriteCoverageHeader(FILE *fp);           // writes "\tSNPused\tCoverage" when coverage information is available
@@ -26,6 +29,9 @@ void ReadRisks(const char *rsfile, StringArray &rsNames, StringArray &familyID, 
 void ReadMatrix(const char *phefile, StringArray &colNames, Matrix &M, int coreCount);
 void ReadMatrix(const char *phefile, StringArray &colNames, StringArray &rowNames, Matrix &M, int coreCount);
 void ReadKeys(const char *filename, StringArray &rsNames, StringArray &annotation);
+// Without --diction: the traits stored in the binary models (<score>.bin) of secretscores that are next to
+// the score file(s) or in the current directory; annotation stays empty when there is none.
+void ReadKeysFromBinaryModels(const char *rsfile, StringArray &rsNames, StringArray &annotation);
 void MakeCovariates(const char *covariateList, StringArray &alltraitNames, StringArray &covList, IntArray &covariates);
 void MakeTraits(Matrix &alltraits, StringArray &alltraitNames, IntArray &covariates, IntArray &affections, IntArray &quantraits);
 void AdjustCovariate(Matrix &risks, Matrix &alltraits, StringArray &alltraitNames, IntArray &quantraits, IntArray &covariates, Matrix &allY, unsigned long long int **masks, int coreCount);
